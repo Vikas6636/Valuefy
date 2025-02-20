@@ -1,85 +1,11 @@
-<!-- <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice to Text Converter</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 50px;
-        }
-        textarea {
-            width: 80%;
-            height: 200px;
-            margin-top: 20px;
-            padding: 10px;
-            font-size: 16px;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 18px;
-            cursor: pointer;
-            margin: 5px;
-        }
-    </style>
-</head>
-<body>
-    <h1>Voice to Text Converter</h1>
-    <button onclick="startVoiceCommand()">Start Meeting</button>
-    <button onclick="stopVoiceCommand()">Meeting</button>
-    <textarea id="output" placeholder="Your speech will appear here..."></textarea>
-
-    <script>
-        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        recognition.lang = 'en-US';
-        recognition.continuous = true;
-        recognition.interimResults = false;
-        let isListening = false;
-
-        recognition.onresult = function(event) {
-            const transcript = event.results[event.results.length - 1][0].transcript;
-            document.getElementById("output").value += transcript + ' ';
-        };
-
-        recognition.onerror = function(event) {
-            console.error("Speech recognition error", event);
-            alert("Error: " + event.error);
-        };
-
-        recognition.onend = function() {
-            if (isListening) {
-                recognition.start(); // Restart recognition if still listening
-            }
-        };
-
-        function startVoiceCommand() {
-            if (!isListening) {
-                isListening = true;
-                recognition.start();
-            }
-        }
-
-        function stopVoiceCommand() {
-            isListening = false;
-            recognition.stop();
-        }
-    </script>
-</body>
-</html> -->
-
-
-
-
-
-
-
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
     <title>Voice to Text Converter</title>
     <style>
         body {
@@ -87,48 +13,68 @@
             text-align: center;
             margin: 50px;
         }
+
         textarea {
             width: 80%;
             height: 200px;
             margin-top: 20px;
             padding: 10px;
             font-size: 16px;
+            border-radius: 10px;
         }
+
         button {
             padding: 10px 20px;
             font-size: 18px;
             cursor: pointer;
             margin: 5px;
+            border-radius: 10px;
         }
     </style>
 </head>
+
 <body>
     <h1>Voice to Text Converter</h1>
     <button onclick="startVoiceCommand()">Start Meeting</button>
-    <button onclick="stopVoiceCommand()">Meeting End</button>
-    <button onclick="openCalendar()">View Calendar Events</button>
+    <button onclick="stopVoiceCommand()">End Meeting</button>
     <textarea id="output" placeholder="Your speech will appear here..."></textarea>
+    <br>
+    <button onclick="getMeetingSummary()">Analyze meeting</button>
+    <br>
+    <div id="summary" style="margin-top: 20px; font-size: 16px; color: #333;"></div>
+    <div id="calendar_events" style="margin-top: 20px; font-size: 16px; color: #333;"></div>
+    <div id="emails" style="margin-top: 20px; font-size: 16px; color: #333;"></div>
+    <div id="todos_tasks" style="margin-top: 20px; font-size: 16px; color: #333;"></div>
+    <div id="calendar"></div>
 
     <script>
-        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (!SpeechRecognition) {
+            alert("Speech Recognition not supported in this browser. Please use Google Chrome.");
+        }
+
+        const recognition = new SpeechRecognition();
         recognition.lang = 'en-US';
         recognition.continuous = true;
         recognition.interimResults = false;
         let isListening = false;
 
-        recognition.onresult = function(event) {
-            const transcript = event.results[event.results.length - 1][0].transcript;
-            document.getElementById("output").value += transcript + ' ';
+        recognition.onresult = function (event) {
+            if (event.results.length > 0) {
+                const transcript = event.results[event.results.length - 1][0].transcript;
+                document.getElementById("output").value += transcript + ' ';
+            }
         };
 
-        recognition.onerror = function(event) {
+        recognition.onerror = function (event) {
             console.error("Speech recognition error", event);
             alert("Error: " + event.error);
         };
 
-        recognition.onend = function() {
+        recognition.onend = function () {
             if (isListening) {
-                recognition.start();
+                setTimeout(() => recognition.start(), 1000); // Small delay to prevent infinite loops
             }
         };
 
@@ -144,9 +90,135 @@
             recognition.stop();
         }
 
-        function openCalendar() {
-            window.open('todo.html', '_blank');
+        async function getMeetingSummary() {
+
+            const text = document.getElementById("output").value;
+            if (!text.trim()) {
+                alert("No text available for summarization.");
+                return;
+            }
+
+            try {
+                const response = await fetch('/summarize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text })  
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch summary');
+                }
+
+                const data = await response.json();
+                const gemini_response = data.gemini_response;
+
+                const summaryContainer = document.getElementById("summary");
+                summaryContainer.innerHTML = '<h2>Meeting Summary</h2>';
+                summaryContainer.style.border = '2px solid grey';
+                summaryContainer.style.width = '80%';
+                summaryContainer.style.margin = '20px auto';
+                summaryContainer.style.padding = '10px';
+                summaryContainer.style.borderRadius = '10px';
+                summaryContainer.innerHTML += gemini_response.summary;
+
+
+                const calendarEventsContainer = document.getElementById("calendar_events");
+                calendarEventsContainer.innerHTML = '';
+                gemini_response.calendar_events.forEach(event => {
+                    const eventDiv = document.createElement("div");
+                    eventDiv.style.padding = '10px';
+                    eventDiv.style.border = '1px solid #333';
+                    eventDiv.style.display = 'inline-block';
+                    eventDiv.style.borderRadius = '10px';
+                    eventDiv.style.width = '200px';
+                    eventDiv.style.height = '100px';
+                    eventDiv.style.margin = '10px auto';
+                    eventDiv.style.display = 'flex';
+                    eventDiv.style.flexDirection = 'column';
+                    eventDiv.style.justifyContent = 'center';
+                    eventDiv.style.alignItems = 'center';
+                    const eventTitle = document.createElement("div");
+                    eventTitle.innerText = `Event: ${event.title}`;
+                    const eventStart = document.createElement("div");
+                    eventStart.innerText = `Start: ${event.start}`;
+                    eventDiv.appendChild(eventTitle);
+                    eventDiv.appendChild(eventStart);
+                    calendarEventsContainer.appendChild(eventDiv);
+                });
+
+                const addEventsButton = document.createElement("button");
+                addEventsButton.innerText = "Add Events to Calendar";
+                addEventsButton.onclick = function () {
+                    var calendarEl = document.getElementById('calendar');
+                    var calendar = new FullCalendar.Calendar(calendarEl, {
+                        initialView: 'dayGridMonth',
+                        events: gemini_response.calendar_events
+                    });
+                    calendar.render();
+                };
+                calendarEventsContainer.appendChild(addEventsButton);
+
+
+                const emailsContainer = document.getElementById("emails");
+                emailsContainer.innerHTML = '<h2>Emails</h2><br>';
+                emailsContainer.style.display = 'flex';
+                emailsContainer.style.flexWrap = 'wrap';
+                emailsContainer.style.gap = '10px';
+                gemini_response.emails.forEach(email => {
+                    const emailDiv = document.createElement("div");
+                    emailDiv.style.padding = '10px';
+                    emailDiv.style.border = '1px solid #333';
+                    emailDiv.style.borderRadius = '10px';
+                    emailDiv.style.width = '500px';
+                    emailDiv.style.height = '150px';
+                    emailDiv.style.display = 'flex';
+                    emailDiv.style.flexDirection = 'column';
+                    emailDiv.style.justifyContent = 'center';
+                    emailDiv.style.alignItems = 'center';
+                    const emailTo = document.createElement("div");
+                    emailTo.innerText = `To: ${email.to}`;
+                    const emailSubject = document.createElement("div");
+                    emailSubject.innerText = `Subject: ${email.subject}`;
+                    const emailBody = document.createElement("div");
+                    emailBody.innerText = `Body: ${email.body}`;
+                    emailDiv.appendChild(emailTo);
+                    emailDiv.appendChild(emailSubject);
+                    emailDiv.appendChild(emailBody);
+                    emailsContainer.appendChild(emailDiv);
+                });
+
+                
+                const todosTasksContainer = document.getElementById("todos_tasks");
+                todosTasksContainer.innerHTML = '<h2>To-Do Tasks</h2><br>';
+                todosTasksContainer.style.display = 'flex';
+                todosTasksContainer.style.flexWrap = 'wrap';
+                todosTasksContainer.style.gap = '10px';
+                gemini_response.todo_tasks.forEach(task => {
+                    const taskDiv = document.createElement("div");
+                    taskDiv.style.padding = '10px';
+                    taskDiv.style.border = '1px solid #333';
+                    taskDiv.style.borderRadius = '10px';
+                    taskDiv.style.width = '200px';
+                    taskDiv.style.height = '100px';
+                    taskDiv.style.display = 'flex';
+                    taskDiv.style.flexDirection = 'column';
+                    taskDiv.style.justifyContent = 'center';
+                    taskDiv.style.alignItems = 'center';
+                    const taskTitle = document.createElement("div");
+                    taskTitle.innerText = `Task: ${task.title}`;
+                    const taskDueDate = document.createElement("div");
+                    taskDueDate.innerText = `Due Date: ${task.due_date}`;
+                    taskDiv.appendChild(taskTitle);
+                    taskDiv.appendChild(taskDueDate);
+                    taskDiv.innerText = `Task: ${task.title}  Due Date: ${task.due_date}`;
+                    todosTasksContainer.appendChild(taskDiv);
+                });
+            } catch (error) {
+                console.error("Error:", error);
+                alert("Error: " + error.message);
+            }
         }
     </script>
 </body>
+
 </html>
